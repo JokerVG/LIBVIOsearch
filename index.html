@@ -1,100 +1,269 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIBVIO 搜索</title>
+    <title>LIBVIO 智能搜索</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f0f0f0;
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --radius: 16px;
+            --shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #f8fafc;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
         .search-container {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background: var(--surface);
+            padding: 2.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            width: min(95vw, 720px);
+            position: relative;
+        }
+
+        h1 {
+            color: #1e293b;
+            font-size: clamp(1.8rem, 5vw, 2.4rem);
             text-align: center;
+            margin-bottom: 2.5rem;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+            min-height: 56px;
+        }
+
+        input {
             width: 100%;
-            max-width: 600px;
+            padding: 1.1rem 1.5rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 1rem;
+            background: var(--surface);
         }
-        .search-container h1 {
-            font-size: 2em;
-            color: #333;
-            margin-bottom: 20px;
-        }
-        .search-container input[type="text"] {
+
+        select {
             width: 100%;
-            padding: 15px;
-            font-size: 1em;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
+            padding: 1.1rem 3rem 1.1rem 1.5rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 1rem;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") 
+                no-repeat right 1rem center/1.2em;
+            -webkit-appearance: none;
+            appearance: none;
         }
-        .search-container select {
+
+        .loader-container {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.9);
+            border-radius: 12px;
+        }
+
+        .loader {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        button {
             width: 100%;
-            padding: 15px;
-            font-size: 1em;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        .search-container button {
-            padding: 15px 20px;
-            font-size: 1em;
-            cursor: pointer;
-            background-color: #007BFF;
+            padding: 1.2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
         }
-        .search-container button:hover {
-            background-color: #0056b3;
-        }
-        .search-container button:active {
-            transform: scale(0.98);
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 640px) {
+            .search-container { padding: 1.8rem; }
+            input, select { padding: 1rem; }
         }
     </style>
 </head>
 <body>
     <div class="search-container">
-        <h1>LIBVIO 搜索</h1>
-        <form onsubmit="search(); return false;">
-            <input type="text" id="searchInput" placeholder="请输入搜索内容">
-            <select id="urlSelect">
-                <option value="https://www.libvio.fun">https://www.libvio.fun</option>
-                <option value="https://libvio.pro">https://libvio.pro</option>
-                <option value="https://libvio.cloud">https://libvio.cloud</option>
-                <option value="https://libvio.mov">https://libvio.mov</option>
-                <option value="https://libvio.vip">https://libvio.vip</option>
-            </select>
-            <button type="submit">搜索</button>
+        <h1>🎬 LIBVIO 智能搜索</h1>
+        <form onsubmit="handleSearch(event)">
+            <div class="input-group">
+                <input type="text" id="searchInput" placeholder="输入影片名称..." required>
+            </div>
+            <div class="input-group">
+                <div class="loader-container" id="loaderContainer">
+                    <div class="loader"></div>
+                </div>
+                <select id="urlSelect" style="display: none"></select>
+            </div>
+            <button type="submit" id="searchBtn" disabled>
+                <span>立即搜索</span>
+            </button>
         </form>
     </div>
 
-    <script>
-        function search() {
-            // 获取用户输入的搜索内容
-            const searchQuery = document.getElementById('searchInput').value;
+<script>
+const DOMAINS = [
+    "https://www.libvio.fun",
+    "https://libvio.pro",
+    "https://libvio.cloud",
+    "https://libvio.mov",
+    "https://libvio.vip"
+];
 
-            // 获取用户选择的网址
-            const selectedUrl = document.getElementById('urlSelect').value;
+const state = {
+    isDetecting: false,
+    controllers: new Set()
+};
 
-            // 构造搜索链接
-            const searchUrl = `${selectedUrl}/search/-------------.html?wd=${encodeURIComponent(searchQuery)}&submit`;
+const elements = {
+    select: document.getElementById('urlSelect'),
+    input: document.getElementById('searchInput'),
+    button: document.getElementById('searchBtn'),
+    loader: document.getElementById('loaderContainer')
+};
 
-            // 在新标签页中打开搜索结果
-            window.open(searchUrl, '_blank');
+// 优化后的延迟检测方法
+async function measureLatency(url) {
+    const controller = new AbortController();
+    const timeout = 1500; // 缩短超时时间到1.5秒
+    const timer = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const start = performance.now();
+        // 使用更可靠的检测目标
+        await fetch(`${url}/favicon.ico?t=${start}`, {
+            method: 'HEAD',
+            mode: 'no-cors',
+            signal: controller.signal,
+            cache: 'no-cache'
+        });
+        return performance.now() - start;
+    } catch {
+        return Infinity;
+    } finally {
+        clearTimeout(timer);
+        controller.abort();
+    }
+}
+
+// 高效检测算法
+async function efficientDetection() {
+    const promises = DOMAINS.map(async domain => {
+        // 并行执行三次检测
+        const measurements = await Promise.all([
+            measureLatency(domain),
+            measureLatency(domain),
+            measureLatency(domain)
+        ]);
+        
+        const valid = measurements.filter(t => t !== Infinity);
+        return {
+            domain,
+            latency: valid.length ? Math.min(...valid) : Infinity
+        };
+    });
+
+    const results = await Promise.all(promises);
+    return results
+        .filter(r => r.latency !== Infinity)
+        .sort((a, b) => a.latency - b.latency);
+}
+
+async function detectBestNode() {
+    if(state.isDetecting) return;
+    
+    state.isDetecting = true;
+    elements.loader.style.display = 'flex';
+    elements.select.style.display = 'none';
+    elements.button.disabled = true;
+
+    try {
+        // 添加全局超时控制
+        const timeoutPromise = new Promise(resolve => 
+            setTimeout(() => resolve('timeout'), 5000)
+        );
+
+        const results = await Promise.race([
+            efficientDetection(),
+            timeoutPromise
+        ]);
+
+        if(results === 'timeout') {
+            throw new Error('检测超时');
         }
-    </script>
+
+        elements.select.innerHTML = results.map(({ domain, latency }) => 
+            `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
+        );
+
+        if(results.length) {
+            elements.select.style.display = 'block';
+            elements.select.value = results[0].domain;
+            elements.button.disabled = false;
+        }
+    } catch {
+        elements.select.innerHTML = '<option value="" disabled>检测超时，请检查网络</option>';
+        elements.select.style.display = 'block';
+    } finally {
+        elements.loader.style.display = 'none';
+        state.isDetecting = false;
+    }
+}
+
+function handleSearch(e) {
+    e.preventDefault();
+    const query = elements.input.value.trim();
+    if(!query) return alert('请输入搜索内容');
+    
+    const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
+    window.open(target, '_blank');
+}
+
+// 初始化检测
+detectBestNode();
+elements.input.focus();
+
+// 点击重新检测
+elements.select.addEventListener('click', () => {
+    if(!state.isDetecting && elements.select.value === '') {
+        detectBestNode();
+    }
+});
+</script>
 </body>
 </html>
