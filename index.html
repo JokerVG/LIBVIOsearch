@@ -24,7 +24,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            overflow: auto; /* 修复位移bug关键点1：改为auto避免移动端滚动冲突 */
+            overflow: auto;
         }
 
         body {
@@ -32,9 +32,9 @@
             background: #f8fafc;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* 修复位移bug关键点2：顶部对齐 */
+            align-items: center;
             padding: 1rem;
-            -webkit-overflow-scrolling: touch; /* 移动端滚动优化 */
+            -webkit-overflow-scrolling: touch;
         }
 
         .search-container {
@@ -43,22 +43,142 @@
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             width: min(95%, 720px);
-            margin: 1rem auto; /* 增加外边距避免位移 */
-            position: relative; /* 修复z-index上下文 */
+            margin: auto;
+            position: relative;
         }
 
-        /* 其他样式保持原样... */
+        h1 {
+            color: #1e293b;
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            text-align: center;
+            margin-bottom: 2rem;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.3;
+        }
 
-        /* 新增移动端优化 */
+        .input-group {
+            margin-bottom: 1.2rem;
+            position: relative;
+            min-height: 52px;
+        }
+
+        input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: var(--surface);
+        }
+
+        select {
+            width: 100%;
+            padding: 1rem 3rem 1rem 1.2rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") 
+                no-repeat right 0.8rem center/1.2em;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .loader-container {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.9);
+            border-radius: 12px;
+        }
+
+        .loader {
+            width: 2rem;
+            height: 2rem;
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        button {
+            width: 100%;
+            padding: 1.1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            position: relative;
+        }
+
+        .button-loading span {
+            visibility: hidden;
+        }
+        .button-loading::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 1.2rem;
+            height: 1.2rem;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes spin { 
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
         @media (max-width: 640px) {
-            .input-group {
-                min-height: 48px; /* 降低高度适应移动端 */
+            body {
+                padding: 0.5rem;
             }
-            
-            select {
-                font-size: 14px; /* 增大字体可读性 */
-                padding-right: 2.5rem; /* 优化下拉箭头位置 */
+
+            .search-container {
+                padding: 1rem;
+                width: 100%;
+                max-width: 100%;
             }
+
+            input, select {
+                padding: 0.9rem;
+                font-size: 0.9rem;
+            }
+
+            button {
+                padding: 1rem;
+                font-size: 0.95rem;
+            }
+        }
+
+        /* 新增错误提示样式 */
+        .error-alert {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translate(-50%, -30px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
         }
     </style>
 </head>
@@ -82,64 +202,113 @@
     </div>
 
     <script>
-        // 修复移动端点击穿透问题
-        let isMobile = /Mobi|Android/i.test(navigator.userAgent);
+        const DOMAINS = [
+            "https://www.libvio.fun",
+            "https://libvio.cloud",
+            "https://libvio.mov",
+            "https://libvio.vip"
+        ];
 
-        // 优化节点检测逻辑
-        async function efficientDetection() {
+        const state = {
+            isDetecting: false,
+            controllers: new Set()
+        };
+
+        const elements = {
+            select: document.getElementById('urlSelect'),
+            input: document.getElementById('searchInput'),
+            button: document.getElementById('searchBtn'),
+            loader: document.getElementById('loaderContainer')
+        };
+
+        // 优化的节点检测方法
+        async function measureLatency(url) {
             const controller = new AbortController();
             state.controllers.add(controller);
             
             try {
-                const results = await Promise.allSettled(
-                    DOMAINS.map(domain => 
-                        fetch(`${domain}/favicon.ico`, { 
-                            signal: controller.signal,
-                            mode: 'no-cors',
-                            cache: 'no-cache'
-                        }).then(() => domain)
-                    )
-                );
-
-                return results
-                    .filter(r => r.status === 'fulfilled')
-                    .map(r => r.value)
-                    .slice(0, 3); // 仅保留前3个可用节点
+                const start = performance.now();
+                const response = await fetch(`${url}/favicon.ico`, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal,
+                    cache: 'no-cache'
+                });
+                return response.ok ? performance.now() - start : Infinity;
             } catch {
-                return [];
+                return Infinity;
             } finally {
                 state.controllers.delete(controller);
             }
         }
 
-        // 修复搜索提交逻辑（兼容GitHub Pages）
+        async function detectBestNode() {
+            if(state.isDetecting) return;
+            
+            state.isDetecting = true;
+            elements.loader.style.display = 'flex';
+            elements.select.style.display = 'none';
+            elements.button.disabled = true;
+
+            try {
+                const results = await Promise.allSettled(
+                    DOMAINS.map(async domain => ({
+                        domain,
+                        latency: await measureLatency(domain)
+                    }))
+                );
+
+                const validNodes = results
+                    .filter(r => r.status === 'fulfilled' && r.value.latency < 2000)
+                    .map(r => r.value)
+                    .sort((a, b) => a.latency - b.latency);
+
+                elements.select.innerHTML = validNodes.length > 0 
+                    ? validNodes.map(({ domain, latency }) => 
+                        `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
+                      ).join('')
+                    : '<option value="" disabled>无可用节点，点击重试</option>';
+
+                elements.select.style.display = 'block';
+                elements.select.value = validNodes[0]?.domain || '';
+                elements.button.disabled = !validNodes.length;
+
+            } catch(error) {
+                showError('节点检测失败');
+            } finally {
+                elements.loader.style.display = 'none';
+                state.isDetecting = false;
+            }
+        }
+
+        // 增强的搜索功能
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return showError('请输入搜索内容');
-            if (!elements.select.value) return showError('节点不可用');
+            if (!elements.select.value) return showError('请选择有效节点');
 
             elements.button.classList.add('button-loading');
-            
-            try {
-                // 使用代理服务绕过CORS限制[1,4](@ref)
-                const proxyUrl = 'https://corsproxy.io/?';
-                const targetUrl = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
-                
-                // 双重验证机制
-                const availabilityCheck = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-                if (!availabilityCheck.ok) throw new Error('服务不可用');
+            elements.button.disabled = true;
 
-                // 正式跳转
-                window.location.href = targetUrl;
+            try {
+                const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
+                const test = await fetch(`https://corsproxy.io/?${encodeURIComponent(target)}`);
+                
+                if (test.ok) {
+                    window.location.href = target;
+                } else {
+                    showError('搜索服务暂不可用');
+                }
             } catch (error) {
-                showError(`搜索失败：${error.message}`);
+                showError('网络连接异常');
             } finally {
                 elements.button.classList.remove('button-loading');
+                elements.button.disabled = false;
             }
         });
 
-        // 新增错误提示方法
+        // 错误提示函数
         function showError(msg) {
             const existAlert = document.querySelector('.error-alert');
             if (existAlert) existAlert.remove();
@@ -147,37 +316,18 @@
             const alert = document.createElement('div');
             alert.className = 'error-alert';
             alert.textContent = msg;
-            
-            // 样式化错误提示
-            Object.assign(alert.style, {
-                position: 'fixed',
-                top: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#ef4444',
-                color: 'white',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 1000
-            });
-            
             document.body.appendChild(alert);
+            
             setTimeout(() => alert.remove(), 3000);
         }
 
-        // 初始化检测优化
-        window.addEventListener('DOMContentLoaded', () => {
-            elements.input.focus();
-            detectBestNode();
-            
-            // 修复下拉列表误触加载问题
-            elements.select.addEventListener('mousedown', (e) => {
-                if (!state.isDetecting && e.target.tagName === 'SELECT') {
-                    detectBestNode();
-                }
-            });
+        // 初始化
+        elements.select.addEventListener('click', () => {
+            if (!state.isDetecting && !elements.select.value) detectBestNode();
         });
+        
+        elements.input.focus();
+        detectBestNode();
     </script>
 </body>
 </html>
