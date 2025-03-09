@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
     <title>LIBVIO 智能搜索</title>
     <style>
         :root {
@@ -271,13 +272,31 @@
             }
         }
 
-        document.getElementById('searchForm').addEventListener('submit', (e) => {
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return alert('请输入搜索内容');
 
-            const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
-            window.location.href = target; // 确保在当前页面跳转
+            const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
+            
+            try {
+                const response = await fetch(target, {
+                    headers: { 'Accept': 'text/html' }
+                });
+
+                if (!response.ok) throw new Error(`HTTP错误: ${response.status}`);
+                if (!response.headers.get('Content-Type').includes('text/html')) {
+                    throw new Error('服务器返回了非HTML内容');
+                }
+
+                const html = await response.text();
+                document.open();
+                document.write(html);
+                document.close();
+            } catch (error) {
+                alert(`搜索失败: ${error.message}`);
+                console.error(error);
+            }
         });
 
         detectBestNode();
