@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LIBVIO 智能搜索</title>
     <style>
-        /* 保持原有样式不变 */
         :root {
             --primary: #6366f1;
             --secondary: #8b5cf6;
@@ -107,16 +106,37 @@
         button {
             width: 100%;
             padding: 1.1rem;
-            background: linear-gradient(135deg, var(--primary, var(--secondary)));
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             border: none;
             border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
             font-size: 1rem;
+            position: relative; /* 新增定位上下文 */
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* 新增按钮加载状态样式 */
+        .button-loading span {
+            visibility: hidden;
+        }
+        .button-loading::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 1.2rem;
+            height: 1.2rem;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes spin { 
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
 
         @media (max-width: 640px) {
             body {
@@ -169,7 +189,7 @@
     </div>
 
     <script>
-        // 使用 libvio 的备用域名（移除了 .pro）
+        // 保持原有域名不变
         const DOMAINS = [
             "https://www.libvio.fun",
             "https://libvio.cloud",
@@ -192,12 +212,11 @@
         // 改进的延迟检测方法
         async function measureLatency(url) {
             const controller = new AbortController();
-            const timeout = 2000; // 延长超时时间
+            const timeout = 2000;
             const timer = setTimeout(() => controller.abort(), timeout);
             
             try {
                 const start = performance.now();
-                // 检测根路径，兼容性更好
                 const response = await fetch(`${url}/`, {
                     method: 'HEAD',
                     mode: 'no-cors',
@@ -205,7 +224,6 @@
                     cache: 'no-cache'
                 });
                 
-                // 放宽状态码验证
                 if (response.status >= 400) return Infinity;
                 return performance.now() - start;
             } catch {
@@ -216,7 +234,7 @@
             }
         }
 
-        // 增强的节点检测算法
+        // 优化的节点检测算法
         async function efficientDetection() {
             const promises = DOMAINS.map(async domain => {
                 try {
@@ -246,7 +264,7 @@
                 .sort((a, b) => a.latency - b.latency);
         }
 
-        // 重构的节点检测主逻辑
+        // 节点检测主逻辑
         async function detectBestNode() {
             if(state.isDetecting) return;
             
@@ -257,7 +275,7 @@
 
             try {
                 const timeoutPromise = new Promise(resolve => 
-                    setTimeout(() => resolve([]), 8000) // 延长超时到8秒
+                    setTimeout(() => resolve([]), 8000)
                 );
 
                 const results = await Promise.race([
@@ -285,26 +303,47 @@
             }
         }
 
-        // 优化的搜索处理逻辑
+        // 修复的搜索处理逻辑
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return alert('请输入搜索内容');
             if (!elements.select.value) return alert('请选择有效节点');
 
+            // 添加按钮加载状态
+            elements.button.classList.add('button-loading');
+            elements.button.disabled = true;
+
             try {
-                const target = `${elements.select.value}/search/${encodeURIComponent(query)}`;
+                const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
+                
+                // 验证链接有效性
                 const testResponse = await fetch(target, { 
                     method: 'HEAD',
-                    mode: 'no-cors'
+                    mode: 'no-cors',
+                    cache: 'no-cache'
                 });
-                
-                // 直接跳转，现代浏览器会自动处理CORS限制
+
+                // 直接跳转
                 window.location.href = target;
             } catch (error) {
-                alert(`正在尝试备用跳转方式...`);
-                // 使用代理作为备用方案
-                window.location.href = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+                // 备用跳转方案
+                try {
+                    const proxyTarget = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+                    const proxyResponse = await fetch(proxyTarget);
+                    
+                    if (proxyResponse.ok) {
+                        window.location.href = target;
+                    } else {
+                        alert('搜索服务暂时不可用，请稍后重试');
+                    }
+                } catch (proxyError) {
+                    alert('网络连接异常，请检查网络设置');
+                }
+            } finally {
+                // 重置按钮状态
+                elements.button.classList.remove('button-loading');
+                elements.button.disabled = false;
             }
         });
 
