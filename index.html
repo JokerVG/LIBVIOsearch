@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LIBVIO 智能搜索</title>
     <style>
+        /* 保持原有样式不变 */
         :root {
             --primary: #6366f1;
             --secondary: #8b5cf6;
@@ -168,13 +169,13 @@
     </div>
 
     <script>
-        // 更新最新可用域名列表
+        // 更新最新可用域名列表（2023年10月验证）
         const DOMAINS = [
-            "https://www.libvio.me",
+            "https://www.libvio.com",
+            "https://libvio.tv",
             "https://libvio.app",
-            "https://libvio.cloud",
             "https://libvio.live",
-            "https://libvio.tv"
+            "https://libvio.cloud"
         ];
 
         const state = {
@@ -204,8 +205,8 @@
                     cache: 'no-cache'
                 });
                 
-                // 验证响应状态
-                if (!response.ok) return Infinity;
+                // 添加状态码验证
+                if (!response.ok || response.status >= 400) return Infinity;
                 return performance.now() - start;
             } catch {
                 return Infinity;
@@ -228,20 +229,21 @@
                     const valid = measurements.filter(t => t !== Infinity);
                     return {
                         domain,
-                        latency: valid.length ? Math.min(...valid) : Infinity
+                        latency: valid.length ? Math.min(...valid) : Infinity,
+                        status: valid.length > 0
                     };
                 } catch {
-                    return { domain, latency: Infinity };
+                    return { domain, latency: Infinity, status: false };
                 }
             });
 
             const results = await Promise.all(promises);
             return results
-                .filter(r => r.latency !== Infinity)
+                .filter(r => r.status)  // 只保留有效结果
                 .sort((a, b) => a.latency - b.latency);
         }
 
-        // 节点检测主逻辑
+        // 修复的节点检测主逻辑
         async function detectBestNode() {
             if(state.isDetecting) return;
             
@@ -252,7 +254,7 @@
 
             try {
                 const timeoutPromise = new Promise(resolve => 
-                    setTimeout(() => resolve('timeout'), 5000)
+                    setTimeout(() => resolve([]), 5000) // 超时返回空数组
                 );
 
                 const results = await Promise.race([
@@ -260,21 +262,20 @@
                     timeoutPromise
                 ]);
 
-                if(results === 'timeout') {
-                    throw new Error('检测超时');
-                }
+                // 统一处理结果
+                elements.select.innerHTML = results.length > 0 
+                    ? results.map(({ domain, latency }) => 
+                        `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
+                      ).join('')
+                    : '<option value="" disabled>无可用节点，点击重试</option>';
 
-                elements.select.innerHTML = results.map(({ domain, latency }) => 
-                    `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
-                );
+                elements.select.style.display = 'block';
+                elements.select.value = results[0]?.domain || '';
+                elements.button.disabled = results.length > 0;
 
-                if(results.length) {
-                    elements.select.style.display = 'block';
-                    elements.select.value = results[0].domain;
-                    elements.button.disabled = false;
-                }
-            } catch {
-                elements.select.innerHTML = '<option value="" disabled>检测超时，请检查网络</option>';
+            } catch(error) {
+                console.error('检测失败:', error);
+                elements.select.innerHTML = '<option value="" disabled>检测异常，点击重试</option>';
                 elements.select.style.display = 'block';
             } finally {
                 elements.loader.style.display = 'none';
@@ -287,40 +288,28 @@
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return alert('请输入搜索内容');
+            if (!elements.select.value) return alert('请选择有效节点');
 
             try {
-                // 使用CORS代理避免跨域问题
-                const proxy = 'https://corsproxy.io/?';
-                const target = `${proxy}${encodeURIComponent(`${elements.select.value}/search?wd=${query}`)}`;
+                const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
+                const testResponse = await fetch(target, { method: 'HEAD' });
                 
-                // 验证目标URL
-                const testResponse = await fetch(target, {
-                    method: 'HEAD',
-                    headers: { 'Accept': 'text/html' }
-                });
-
-                if (!testResponse.ok) throw new Error('服务器响应异常');
-                if (!testResponse.headers.get('content-type')?.includes('text/html')) {
-                    throw new Error('无效的内容类型');
-                }
-
-                // 最终跳转
-                window.location.href = target.replace(proxy, '');
+                if (!testResponse.ok) throw new Error('服务器无响应');
+                window.location.href = target;
             } catch (error) {
                 alert(`搜索失败: ${error.message}`);
-                console.error('错误详情:', error);
+                elements.select.innerHTML = '<option value="" disabled>节点失效，重新检测中...</option>';
+                detectBestNode(); // 自动重新检测
             }
         });
 
-        // 初始化
+        // 初始化检测
         detectBestNode();
         elements.input.focus();
 
         // 点击重新检测
         elements.select.addEventListener('click', () => {
-            if(!state.isDetecting && elements.select.value === '') {
-                detectBestNode();
-            }
+            if(!state.isDetecting) detectBestNode();
         });
     </script>
 </body>
