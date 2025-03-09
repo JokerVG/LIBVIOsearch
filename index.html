@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
     <title>LIBVIO 智能搜索</title>
     <style>
         :root {
@@ -24,17 +24,18 @@
         html, body {
             height: 100%;
             width: 100%;
-            overflow: hidden; /* 防止移动端滚动条抖动 */
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* 修复移动端点击高亮 */
         }
 
         body {
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
             background: #f8fafc;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 1rem;
-            position: relative; /* 修复位移bug关键点1 */
+            position: relative;
         }
 
         .search-container {
@@ -45,7 +46,7 @@
             width: min(95%, 720px);
             margin: auto;
             position: relative;
-            transform: translateZ(0); /* 修复位移bug关键点2：强制硬件加速 */
+            backface-visibility: hidden; /* 修复动画闪烁 */
         }
 
         h1 {
@@ -73,6 +74,7 @@
             border-radius: 12px;
             font-size: 0.95rem;
             background: var(--surface);
+            caret-color: var(--primary); /* 光标颜色优化 */
         }
 
         select {
@@ -93,8 +95,9 @@
             display: none;
             align-items: center;
             justify-content: center;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.95);
             border-radius: 12px;
+            z-index: 1; /* 确保加载层覆盖下拉 */
         }
 
         .loader {
@@ -117,6 +120,7 @@
             cursor: pointer;
             font-size: 1rem;
             position: relative;
+            user-select: none; /* 防止快速点击选中文本 */
         }
 
         .button-loading span {
@@ -143,26 +147,24 @@
         @media (max-width: 640px) {
             body {
                 padding: 0.5rem;
+                align-items: flex-start; /* 移动端顶部对齐 */
             }
 
             .search-container {
                 padding: 1rem;
-                width: 100%;
-                max-width: 100%;
+                margin-top: 5vh; /* 留出键盘空间 */
             }
 
             input, select {
                 padding: 0.9rem;
-                font-size: 0.9rem;
+                font-size: 16px; /* 移动端输入法优化 */
             }
 
             button {
                 padding: 1rem;
-                font-size: 0.95rem;
             }
         }
 
-        /* 新增错误提示样式 */
         .error-alert {
             position: fixed;
             top: 20px;
@@ -222,24 +224,39 @@
             loader: document.getElementById('loaderContainer')
         };
 
-        // 优化的节点检测方法
-        async function measureLatency(url) {
+        // 增强版节点检测
+        async function checkDomain(domain) {
             const controller = new AbortController();
             state.controllers.add(controller);
             
             try {
-                const start = performance.now();
-                const response = await fetch(`${url}/favicon.ico`, {
-                    method: 'HEAD',
-                    mode: 'no-cors',
-                    signal: controller.signal,
-                    cache: 'no-cache'
-                });
-                return response.ok ? performance.now() - start : Infinity;
+                // 双重检测机制
+                const [latency1, latency2] = await Promise.all([
+                    pingDomain(domain),
+                    new Promise(resolve => setTimeout(() => resolve(Infinity), 1500))
+                        .then(() => pingDomain(domain))
+                ]);
+                
+                return Math.min(latency1, latency2);
             } catch {
                 return Infinity;
             } finally {
+                controller.abort();
                 state.controllers.delete(controller);
+            }
+        }
+
+        async function pingDomain(domain) {
+            try {
+                const start = Date.now();
+                const resp = await fetch(`${domain}/apple-touch-icon.png`, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                return resp.ok ? Date.now() - start : Infinity;
+            } catch {
+                return Infinity;
             }
         }
 
@@ -255,35 +272,38 @@
                 const results = await Promise.allSettled(
                     DOMAINS.map(async domain => ({
                         domain,
-                        latency: await measureLatency(domain)
+                        latency: await checkDomain(domain)
                     }))
                 );
 
                 const validNodes = results
-                    .filter(r => r.status === 'fulfilled' && r.value.latency < 2000)
+                    .filter(r => r.status === 'fulfilled' && r.value.latency < 2500)
                     .map(r => r.value)
                     .sort((a, b) => a.latency - b.latency);
 
-                elements.select.innerHTML = validNodes.length > 0 
-                    ? validNodes.map(({ domain, latency }) => 
-                        `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
-                      ).join('')
-                    : '<option value="" disabled>无可用节点，点击重试</option>';
-
-                elements.select.style.display = 'block';
-                elements.select.value = validNodes[0]?.domain || '';
-                elements.button.disabled = !validNodes.length;
-
+                updateSelect(validNodes);
             } catch(error) {
-                showError('节点检测失败');
+                showError('节点检测失败，点击重试');
             } finally {
                 elements.loader.style.display = 'none';
                 state.isDetecting = false;
             }
         }
 
-        // 增强的搜索功能
-        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+        function updateSelect(nodes) {
+            elements.select.innerHTML = nodes.length > 0 
+                ? nodes.map(({ domain, latency }) => 
+                    `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
+                  ).join('')
+                : '<option value="" disabled>无可用节点，点击重试</option>';
+
+            elements.select.style.display = 'block';
+            elements.select.value = nodes[0]?.domain || '';
+            elements.button.disabled = !nodes.length;
+        }
+
+        // 稳健的搜索处理
+        async function handleSearch(e) {
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return showError('请输入搜索内容');
@@ -294,12 +314,16 @@
 
             try {
                 const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
-                const test = await fetch(`https://corsproxy.io/?${encodeURIComponent(target)}`);
                 
-                if (test.ok) {
+                // 先验证链接可达性
+                const test = await fetch(`https://corsproxy.io/?${encodeURIComponent(target)}`, {
+                    redirect: 'manual'
+                });
+
+                if (test.status === 0 || test.status === 200) {
                     window.location.href = target;
                 } else {
-                    showError('搜索服务暂不可用');
+                    showError('搜索服务暂时不可用');
                 }
             } catch (error) {
                 showError('网络连接异常');
@@ -307,9 +331,8 @@
                 elements.button.classList.remove('button-loading');
                 elements.button.disabled = false;
             }
-        });
+        }
 
-        // 错误提示函数
         function showError(msg) {
             const existAlert = document.querySelector('.error-alert');
             if (existAlert) existAlert.remove();
@@ -322,13 +345,30 @@
             setTimeout(() => alert.remove(), 3000);
         }
 
-        // 初始化
-        elements.select.addEventListener('click', () => {
-            if (!state.isDetecting && !elements.select.value) detectBestNode();
-        });
-        
-        elements.input.focus();
-        detectBestNode();
+        // 事件监听优化
+        function init() {
+            // 正确的事件委托
+            elements.select.addEventListener('mousedown', (e) => {
+                if (!state.isDetecting && e.target === elements.select) {
+                    detectBestNode();
+                }
+            });
+
+            document.getElementById('searchForm').addEventListener('submit', handleSearch);
+            window.addEventListener('beforeunload', () => {
+                state.controllers.forEach(c => c.abort());
+            });
+            
+            elements.input.focus();
+            detectBestNode();
+        }
+
+        // 安全初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
