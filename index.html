@@ -21,14 +21,19 @@
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'Inter', system-ui, sans-serif;
             background: #f8fafc;
-            display: grid;
-            place-items: center;
-            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             padding: 1rem;
-            overflow: hidden;
         }
 
         .search-container {
@@ -36,8 +41,7 @@
             padding: 1.5rem;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
-            width: min(95vw, 720px);
-            position: relative;
+            width: min(95%, 720px);
             margin: auto;
         }
 
@@ -116,14 +120,12 @@
         @media (max-width: 640px) {
             body {
                 padding: 0.5rem;
-                display: block;
             }
 
             .search-container {
                 padding: 1rem;
                 width: 100%;
-                border-radius: 0;
-                box-shadow: none;
+                max-width: 100%;
             }
 
             input, select {
@@ -134,6 +136,14 @@
             button {
                 padding: 1rem;
                 font-size: 0.95rem;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .search-container {
+                margin-top: 1rem;
+                overflow-y: auto;
+                max-height: 95vh;
             }
         }
     </style>
@@ -157,130 +167,127 @@
         </form>
     </div>
 
-<script>
-const DOMAINS = [
-    "https://www.libvio.fun",
-    "https://libvio.pro",
-    "https://libvio.cloud",
-    "https://libvio.mov",
-    "https://libvio.vip"
-];
+    <script>
+        const DOMAINS = [
+            "https://www.libvio.fun",
+            "https://libvio.pro",
+            "https://libvio.cloud",
+            "https://libvio.mov",
+            "https://libvio.vip"
+        ];
 
-const state = {
-    isDetecting: false,
-    controllers: new Set()
-};
-
-const elements = {
-    select: document.getElementById('urlSelect'),
-    input: document.getElementById('searchInput'),
-    button: document.getElementById('searchBtn'),
-    loader: document.getElementById('loaderContainer')
-};
-
-async function measureLatency(url) {
-    const controller = new AbortController();
-    const timeout = 1500;
-    const timer = setTimeout(() => controller.abort(), timeout);
-    
-    try {
-        const start = performance.now();
-        await fetch(`${url}/favicon.ico?t=${start}`, {
-            method: 'HEAD',
-            mode: 'no-cors',
-            signal: controller.signal,
-            cache: 'no-cache'
-        });
-        return performance.now() - start;
-    } catch {
-        return Infinity;
-    } finally {
-        clearTimeout(timer);
-        controller.abort();
-    }
-}
-
-async function efficientDetection() {
-    const promises = DOMAINS.map(async domain => {
-        const measurements = await Promise.all([
-            measureLatency(domain),
-            measureLatency(domain),
-            measureLatency(domain)
-        ]);
-        
-        const valid = measurements.filter(t => t !== Infinity);
-        return {
-            domain,
-            latency: valid.length ? Math.min(...valid) : Infinity
+        const state = {
+            isDetecting: false,
+            controllers: new Set()
         };
-    });
 
-    const results = await Promise.all(promises);
-    return results
-        .filter(r => r.latency !== Infinity)
-        .sort((a, b) => a.latency - b.latency);
-}
+        const elements = {
+            select: document.getElementById('urlSelect'),
+            input: document.getElementById('searchInput'),
+            button: document.getElementById('searchBtn'),
+            loader: document.getElementById('loaderContainer')
+        };
 
-async function detectBestNode() {
-    if(state.isDetecting) return;
-    
-    state.isDetecting = true;
-    elements.loader.style.display = 'flex';
-    elements.select.style.display = 'none';
-    elements.button.disabled = true;
-
-    try {
-        const timeoutPromise = new Promise(resolve => 
-            setTimeout(() => resolve('timeout'), 5000)
-        );
-
-        const results = await Promise.race([
-            efficientDetection(),
-            timeoutPromise
-        ]);
-
-        if(results === 'timeout') {
-            throw new Error('检测超时');
+        async function measureLatency(url) {
+            const controller = new AbortController();
+            const timeout = 1500;
+            const timer = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+                const start = performance.now();
+                await fetch(`${url}/favicon.ico?t=${start}`, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal,
+                    cache: 'no-cache'
+                });
+                return performance.now() - start;
+            } catch {
+                return Infinity;
+            } finally {
+                clearTimeout(timer);
+                controller.abort();
+            }
         }
 
-        elements.select.innerHTML = results.map(({ domain, latency }) => 
-            `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
-        );
+        async function efficientDetection() {
+            const promises = DOMAINS.map(async domain => {
+                const measurements = await Promise.all([
+                    measureLatency(domain),
+                    measureLatency(domain),
+                    measureLatency(domain)
+                ]);
+                
+                const valid = measurements.filter(t => t !== Infinity);
+                return {
+                    domain,
+                    latency: valid.length ? Math.min(...valid) : Infinity
+                };
+            });
 
-        if(results.length) {
-            elements.select.style.display = 'block';
-            elements.select.value = results[0].domain;
-            elements.button.disabled = false;
+            const results = await Promise.all(promises);
+            return results
+                .filter(r => r.latency !== Infinity)
+                .sort((a, b) => a.latency - b.latency);
         }
-    } catch {
-        elements.select.innerHTML = '<option value="" disabled>检测超时，请检查网络</option>';
-        elements.select.style.display = 'block';
-    } finally {
-        elements.loader.style.display = 'none';
-        state.isDetecting = false;
-    }
-}
 
-// 修改后的搜索逻辑
-document.getElementById('searchForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const query = elements.input.value.trim();
-    if (!query) return alert('请输入搜索内容');
+        async function detectBestNode() {
+            if(state.isDetecting) return;
+            
+            state.isDetecting = true;
+            elements.loader.style.display = 'flex';
+            elements.select.style.display = 'none';
+            elements.button.disabled = true;
 
-    const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
-    window.location.href = target; // 确保在当前页面跳转
-});
+            try {
+                const timeoutPromise = new Promise(resolve => 
+                    setTimeout(() => resolve('timeout'), 5000)
+                );
 
-// 初始化检测
-detectBestNode();
-elements.input.focus();
+                const results = await Promise.race([
+                    efficientDetection(),
+                    timeoutPromise
+                ]);
 
-// 点击重新检测
-elements.select.addEventListener('click', () => {
-    if(!state.isDetecting && elements.select.value === '') {
+                if(results === 'timeout') {
+                    throw new Error('检测超时');
+                }
+
+                elements.select.innerHTML = results.map(({ domain, latency }) => 
+                    `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
+                );
+
+                if(results.length) {
+                    elements.select.style.display = 'block';
+                    elements.select.value = results[0].domain;
+                    elements.button.disabled = false;
+                }
+            } catch {
+                elements.select.innerHTML = '<option value="" disabled>检测超时，请检查网络</option>';
+                elements.select.style.display = 'block';
+            } finally {
+                elements.loader.style.display = 'none';
+                state.isDetecting = false;
+            }
+        }
+
+        document.getElementById('searchForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = elements.input.value.trim();
+            if (!query) return alert('请输入搜索内容');
+
+            const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
+            window.location.href = target; // 确保在当前页面跳转
+        });
+
         detectBestNode();
-    }
-});
-</script>
+        elements.input.focus();
+
+        elements.select.addEventListener('click', () => {
+            if(!state.isDetecting && elements.select.value === '') {
+                detectBestNode();
+            }
+        });
+    </script>
 </body>
 </html>
