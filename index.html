@@ -24,7 +24,7 @@
         html, body {
             height: 100%;
             width: 100%;
-            overflow: auto;
+            overflow: hidden; /* 防止移动端滚动条抖动 */
         }
 
         body {
@@ -34,7 +34,7 @@
             justify-content: center;
             align-items: center;
             padding: 1rem;
-            -webkit-overflow-scrolling: touch;
+            position: relative; /* 修复位移bug关键点1 */
         }
 
         .search-container {
@@ -45,6 +45,7 @@
             width: min(95%, 720px);
             margin: auto;
             position: relative;
+            transform: translateZ(0); /* 修复位移bug关键点2：强制硬件加速 */
         }
 
         h1 {
