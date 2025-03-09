@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
     <title>LIBVIO 智能搜索</title>
     <style>
         :root {
@@ -152,7 +151,7 @@
 <body>
     <div class="search-container">
         <h1>🎬 LIBVIO 智能搜索</h1>
-        <form id="searchForm" target="_self">
+        <form id="searchForm">
             <div class="input-group">
                 <input type="text" id="searchInput" placeholder="输入影片名称..." required>
             </div>
@@ -169,12 +168,13 @@
     </div>
 
     <script>
+        // 更新最新可用域名列表
         const DOMAINS = [
-            "https://www.libvio.fun",
-            "https://libvio.pro",
+            "https://www.libvio.me",
+            "https://libvio.app",
             "https://libvio.cloud",
-            "https://libvio.mov",
-            "https://libvio.vip"
+            "https://libvio.live",
+            "https://libvio.tv"
         ];
 
         const state = {
@@ -189,6 +189,7 @@
             loader: document.getElementById('loaderContainer')
         };
 
+        // 增强的延迟检测方法
         async function measureLatency(url) {
             const controller = new AbortController();
             const timeout = 1500;
@@ -196,12 +197,15 @@
             
             try {
                 const start = performance.now();
-                await fetch(`${url}/favicon.ico?t=${start}`, {
+                const response = await fetch(`${url}/favicon.ico?t=${start}`, {
                     method: 'HEAD',
                     mode: 'no-cors',
                     signal: controller.signal,
                     cache: 'no-cache'
                 });
+                
+                // 验证响应状态
+                if (!response.ok) return Infinity;
                 return performance.now() - start;
             } catch {
                 return Infinity;
@@ -211,19 +215,24 @@
             }
         }
 
+        // 优化的节点检测算法
         async function efficientDetection() {
             const promises = DOMAINS.map(async domain => {
-                const measurements = await Promise.all([
-                    measureLatency(domain),
-                    measureLatency(domain),
-                    measureLatency(domain)
-                ]);
-                
-                const valid = measurements.filter(t => t !== Infinity);
-                return {
-                    domain,
-                    latency: valid.length ? Math.min(...valid) : Infinity
-                };
+                try {
+                    const measurements = await Promise.all([
+                        measureLatency(domain),
+                        measureLatency(domain),
+                        measureLatency(domain)
+                    ]);
+                    
+                    const valid = measurements.filter(t => t !== Infinity);
+                    return {
+                        domain,
+                        latency: valid.length ? Math.min(...valid) : Infinity
+                    };
+                } catch {
+                    return { domain, latency: Infinity };
+                }
             });
 
             const results = await Promise.all(promises);
@@ -232,6 +241,7 @@
                 .sort((a, b) => a.latency - b.latency);
         }
 
+        // 节点检测主逻辑
         async function detectBestNode() {
             if(state.isDetecting) return;
             
@@ -272,36 +282,41 @@
             }
         }
 
+        // 增强的搜索处理逻辑
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = elements.input.value.trim();
             if (!query) return alert('请输入搜索内容');
 
-            const target = `${elements.select.value}/search?wd=${encodeURIComponent(query)}`;
-            
             try {
-                const response = await fetch(target, {
+                // 使用CORS代理避免跨域问题
+                const proxy = 'https://corsproxy.io/?';
+                const target = `${proxy}${encodeURIComponent(`${elements.select.value}/search?wd=${query}`)}`;
+                
+                // 验证目标URL
+                const testResponse = await fetch(target, {
+                    method: 'HEAD',
                     headers: { 'Accept': 'text/html' }
                 });
 
-                if (!response.ok) throw new Error(`HTTP错误: ${response.status}`);
-                if (!response.headers.get('Content-Type').includes('text/html')) {
-                    throw new Error('服务器返回了非HTML内容');
+                if (!testResponse.ok) throw new Error('服务器响应异常');
+                if (!testResponse.headers.get('content-type')?.includes('text/html')) {
+                    throw new Error('无效的内容类型');
                 }
 
-                const html = await response.text();
-                document.open();
-                document.write(html);
-                document.close();
+                // 最终跳转
+                window.location.href = target.replace(proxy, '');
             } catch (error) {
                 alert(`搜索失败: ${error.message}`);
-                console.error(error);
+                console.error('错误详情:', error);
             }
         });
 
+        // 初始化
         detectBestNode();
         elements.input.focus();
 
+        // 点击重新检测
         elements.select.addEventListener('click', () => {
             if(!state.isDetecting && elements.select.value === '') {
                 detectBestNode();
