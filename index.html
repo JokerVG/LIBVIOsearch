@@ -141,7 +141,7 @@
 <body>
     <div class="search-container">
         <h1>🎬 LIBVIO 智能搜索</h1>
-        <form onsubmit="handleSearch(event)">
+        <form id="searchForm" target="_self">
             <div class="input-group">
                 <input type="text" id="searchInput" placeholder="输入影片名称..." required>
             </div>
@@ -261,18 +261,21 @@ async function detectBestNode() {
     }
 }
 
-function handleSearch(e) {
+// 修改后的搜索逻辑
+document.getElementById('searchForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const query = elements.input.value.trim();
-    if(!query) return alert('请输入搜索内容');
-    
-    const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
-    window.location.href = target; // 修改为当前页面跳转
-}
+    if (!query) return alert('请输入搜索内容');
 
+    const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
+    window.location.href = target; // 确保在当前页面跳转
+});
+
+// 初始化检测
 detectBestNode();
 elements.input.focus();
 
+// 点击重新检测
 elements.select.addEventListener('click', () => {
     if(!state.isDetecting && elements.select.value === '') {
         detectBestNode();
