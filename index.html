@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LIBVIO 智能搜索</title>
     <style>
         :root {
@@ -27,52 +27,55 @@
             display: grid;
             place-items: center;
             min-height: 100vh;
-            padding: 2rem;
+            padding: 1rem;
+            overflow: hidden;
         }
 
         .search-container {
             background: var(--surface);
-            padding: 2.5rem;
+            padding: 1.5rem;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             width: min(95vw, 720px);
             position: relative;
+            margin: auto;
         }
 
         h1 {
             color: #1e293b;
-            font-size: clamp(1.8rem, 5vw, 2.4rem);
+            font-size: clamp(1.5rem, 5vw, 2rem);
             text-align: center;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
             letter-spacing: -0.025em;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            line-height: 1.3;
         }
 
         .input-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.2rem;
             position: relative;
-            min-height: 56px;
+            min-height: 52px;
         }
 
         input {
             width: 100%;
-            padding: 1.1rem 1.5rem;
+            padding: 1rem;
             border: 2px solid var(--border);
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             background: var(--surface);
         }
 
         select {
             width: 100%;
-            padding: 1.1rem 3rem 1.1rem 1.5rem;
+            padding: 1rem 3rem 1rem 1.2rem;
             border: 2px solid var(--border);
             border-radius: 12px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") 
-                no-repeat right 1rem center/1.2em;
+                no-repeat right 0.8rem center/1.2em;
             -webkit-appearance: none;
             appearance: none;
         }
@@ -88,8 +91,8 @@
         }
 
         .loader {
-            width: 2.5rem;
-            height: 2.5rem;
+            width: 2rem;
+            height: 2rem;
             border: 3px solid rgba(99, 102, 241, 0.1);
             border-top-color: var(--primary);
             border-radius: 50%;
@@ -98,22 +101,40 @@
 
         button {
             width: 100%;
-            padding: 1.2rem;
+            padding: 1.1rem;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             border: none;
             border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
-            position: relative;
-            overflow: hidden;
+            font-size: 1rem;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 640px) {
-            .search-container { padding: 1.8rem; }
-            input, select { padding: 1rem; }
+            body {
+                padding: 0.5rem;
+                display: block;
+            }
+
+            .search-container {
+                padding: 1rem;
+                width: 100%;
+                border-radius: 0;
+                box-shadow: none;
+            }
+
+            input, select {
+                padding: 0.9rem;
+                font-size: 0.9rem;
+            }
+
+            button {
+                padding: 1rem;
+                font-size: 0.95rem;
+            }
         }
     </style>
 </head>
@@ -157,15 +178,13 @@ const elements = {
     loader: document.getElementById('loaderContainer')
 };
 
-// 优化后的延迟检测方法
 async function measureLatency(url) {
     const controller = new AbortController();
-    const timeout = 1500; // 缩短超时时间到1.5秒
+    const timeout = 1500;
     const timer = setTimeout(() => controller.abort(), timeout);
     
     try {
         const start = performance.now();
-        // 使用更可靠的检测目标
         await fetch(`${url}/favicon.ico?t=${start}`, {
             method: 'HEAD',
             mode: 'no-cors',
@@ -181,10 +200,8 @@ async function measureLatency(url) {
     }
 }
 
-// 高效检测算法
 async function efficientDetection() {
     const promises = DOMAINS.map(async domain => {
-        // 并行执行三次检测
         const measurements = await Promise.all([
             measureLatency(domain),
             measureLatency(domain),
@@ -213,7 +230,6 @@ async function detectBestNode() {
     elements.button.disabled = true;
 
     try {
-        // 添加全局超时控制
         const timeoutPromise = new Promise(resolve => 
             setTimeout(() => resolve('timeout'), 5000)
         );
@@ -251,14 +267,12 @@ function handleSearch(e) {
     if(!query) return alert('请输入搜索内容');
     
     const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
-    window.open(target, '_blank');
+    window.location.href = target; // 修改为当前页面跳转
 }
 
-// 初始化检测
 detectBestNode();
 elements.input.focus();
 
-// 点击重新检测
 elements.select.addEventListener('click', () => {
     if(!state.isDetecting && elements.select.value === '') {
         detectBestNode();
