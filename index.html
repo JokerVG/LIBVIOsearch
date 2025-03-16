@@ -12,6 +12,7 @@
             --border: #e2e8f0;
             --radius: 12px;
             --shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.1);
+            --error: #ef4444;
         }
 
         * {
@@ -76,6 +77,17 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
+        input:invalid {
+            border-color: var(--error);
+            animation: shake 0.3s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(4px); }
+            75% { transform: translateX(-4px); }
+        }
+
         select {
             padding-right: 2.2rem;
             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") 
@@ -84,7 +96,6 @@
             appearance: none;
         }
 
-        /* 紧凑气泡设计 */
         .bubbles-container {
             display: flex;
             flex-wrap: wrap;
@@ -120,7 +131,6 @@
             opacity: 0.6;
         }
 
-        /* 迷你清除按钮 */
         .clear-bubbles {
             position: absolute;
             top: 1rem;
@@ -210,6 +220,9 @@
                     id="searchInput" 
                     placeholder="输入影片名称..."
                     autocomplete="off"
+                    required
+                    minlength="1"
+                    maxlength="100"
                 >
             </div>
 
@@ -220,10 +233,11 @@
                     id="urlSelect" 
                     style="display: none"
                     aria-label="选择访问节点"
+                    aria-busy="false"
                 >
                     <option value="" disabled>正在检测最佳节点...</option>
                 </select>
-                <div class="loader-container" id="loaderContainer">
+                <div class="loader-container" id="loaderContainer" aria-live="polite" aria-atomic="true" role="status">
                     <div class="loader"></div>
                 </div>
             </div>
@@ -238,7 +252,8 @@
         const CONFIG = {
             MAX_HISTORY: 8,
             STORAGE_KEY: 'searchHistory',
-            TIMEOUT: 5000
+            TIMEOUT: 5000,
+            BATCH_SIZE: 2
         };
 
         const DOMAINS = [
@@ -249,84 +264,90 @@
             "https://libvio.vip"
         ];
 
-        const state = {
-            searchHistory: JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY)) || [],
-            isDetecting: false
-        };
+        class SearchHistory {
+            constructor(config) {
+                this.STORAGE_KEY = config.STORAGE_KEY;
+                this.MAX_HISTORY = config.MAX_HISTORY;
+            }
 
-        const elements = {
-            input: document.getElementById('searchInput'),
-            bubblesContainer: document.getElementById('bubblesContainer'),
-            clearBubbles: document.getElementById('clearBubbles'),
-            form: document.getElementById('searchForm'),
-            select: document.getElementById('urlSelect'),
-            loader: document.getElementById('loaderContainer'),
-            button: document.getElementById('searchBtn')
-        };
-
-        // 历史记录功能
-        const SearchHistory = {
-            save: keyword => {
+            save(keyword) {
+                const sanitized = keyword.replace(/<[^>]*>?/gm, '');
                 state.searchHistory = [
-                    keyword,
-                    ...state.searchHistory.filter(item => item !== keyword)
-                ].slice(0, CONFIG.MAX_HISTORY);
-                localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(state.searchHistory));
-                SearchHistory.render();
-            },
+                    sanitized,
+                    ...state.searchHistory.filter(item => item !== sanitized)
+                ].slice(0, this.MAX_HISTORY);
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state.searchHistory));
+                this.render();
+            }
 
-            render: () => {
+            render() {
                 elements.bubblesContainer.innerHTML = state.searchHistory
                     .map(keyword => `
                         <div class="history-bubble" data-keyword="${keyword}">
                             ${keyword}
                         </div>
                     `).join('');
-            },
-
-            clear: () => {
-                state.searchHistory = [];
-                localStorage.removeItem(CONFIG.STORAGE_KEY);
-                SearchHistory.render();
             }
-        };
 
-        // 节点检测功能
-        const NodeDetector = {
-            measureLatency: async (url) => {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+            clear() {
+                state.searchHistory = [];
+                localStorage.removeItem(this.STORAGE_KEY);
+                this.render();
+            }
+        }
 
-                try {
-                    const start = performance.now();
-                    await fetch(`${url}/favicon.ico?t=${start}`, {
-                        method: 'HEAD',
-                        mode: 'no-cors',
-                        signal: controller.signal,
-                        cache: 'no-cache'
-                    });
-                    clearTimeout(timeout);
-                    return performance.now() - start;
-                } catch {
-                    return Infinity;
+        class NodeDetector {
+            constructor(config) {
+                this.TIMEOUT = config.TIMEOUT;
+                this.BATCH_SIZE = config.BATCH_SIZE;
+            }
+
+            async measureLatency(url, retries = 2) {
+                for (let i = 0; i <= retries; i++) {
+                    try {
+                        const controller = new AbortController();
+                        const timeout = setTimeout(() => controller.abort(), this.TIMEOUT);
+                        const start = performance.now();
+                        await fetch(`${url}/favicon.ico?t=${start}`, {
+                            method: 'HEAD',
+                            mode: 'no-cors',
+                            signal: controller.signal,
+                            cache: 'no-cache'
+                        });
+                        clearTimeout(timeout);
+                        return performance.now() - start;
+                    } catch (e) {
+                        if (i === retries) throw e;
+                        await new Promise(r => setTimeout(r, 500 * (i + 1)));
+                    }
                 }
-            },
+            }
 
-            detectNodes: async () => {
+            async detectNodes() {
                 if (state.isDetecting) return;
                 state.isDetecting = true;
 
                 elements.loader.style.display = 'block';
                 elements.select.style.display = 'none';
                 elements.button.setAttribute('aria-disabled', 'true');
+                elements.button.innerHTML = `
+                    <div class="loader" style="margin: 0 auto"></div>
+                    正在检测节点...
+                `;
 
                 try {
-                    const results = await Promise.all(
-                        DOMAINS.map(async domain => ({
-                            domain,
-                            latency: await NodeDetector.measureLatency(domain)
-                        }))
-                    );
+                    const batches = [];
+                    for (let i = 0; i < DOMAINS.length; i += this.BATCH_SIZE) {
+                        batches.push(DOMAINS.slice(i, i + this.BATCH_SIZE));
+                    }
+
+                    const results = [];
+                    for (const batch of batches) {
+                        await Promise.all(batch.map(async domain => {
+                            const latency = await this.measureLatency(domain);
+                            results.push({ domain, latency });
+                        }));
+                    }
 
                     const validResults = results
                         .filter(r => r.latency !== Infinity)
@@ -348,12 +369,31 @@
                     alert('节点检测失败，请稍后重试');
                 } finally {
                     elements.loader.style.display = 'none';
+                    elements.button.innerHTML = '立即搜索';
                     state.isDetecting = false;
                 }
             }
+        }
+
+        const state = {
+            searchHistory: JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY)) || [],
+            isDetecting: false
         };
 
-        // 事件处理
+        const elements = {
+            input: document.getElementById('searchInput'),
+            bubblesContainer: document.getElementById('bubblesContainer'),
+            clearBubbles: document.getElementById('clearBubbles'),
+            form: document.getElementById('searchForm'),
+            select: document.getElementById('urlSelect'),
+            loader: document.getElementById('loaderContainer'),
+            button: document.getElementById('searchBtn')
+        };
+
+        const searchHistory = new SearchHistory(CONFIG);
+        const nodeDetector = new NodeDetector(CONFIG);
+
+        // 事件绑定
         elements.bubblesContainer.addEventListener('click', e => {
             const bubble = e.target.closest('.history-bubble');
             if (bubble) {
@@ -362,7 +402,7 @@
             }
         });
 
-        elements.clearBubbles.addEventListener('click', SearchHistory.clear);
+        elements.clearBubbles.addEventListener('click', () => searchHistory.clear());
 
         elements.form.addEventListener('submit', e => {
             e.preventDefault();
@@ -379,13 +419,13 @@
                 return;
             }
 
-            SearchHistory.save(keyword);
+            searchHistory.save(keyword);
             window.location.href = `${selectedDomain}/search/-------------.html?wd=${encodeURIComponent(keyword)}`;
         });
 
         // 初始化
-        SearchHistory.render();
-        NodeDetector.detectNodes();
+        searchHistory.render();
+        nodeDetector.detectNodes();
     </script>
 </body>
 </html>
