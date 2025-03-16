@@ -10,15 +10,15 @@
             --secondary: #8b5cf6;
             --surface: #ffffff;
             --border: #e2e8f0;
-            --radius: 16px;
-            --shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.15);
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.1);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s ease;
         }
 
         html, body {
@@ -41,109 +41,159 @@
             padding: 1.5rem;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
-            width: min(95%, 720px);
+            width: min(95%, 440px);
             margin: auto;
+            position: relative;
         }
 
         h1 {
-            color: #1e293b;
-            font-size: clamp(1.5rem, 5vw, 2rem);
+            font-size: 1.6rem;
             text-align: center;
-            margin-bottom: 2rem;
-            letter-spacing: -0.025em;
+            margin-bottom: 1.2rem;
+            color: #1e293b;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            line-height: 1.3;
         }
 
         .input-group {
-            margin-bottom: 1.2rem;
+            margin-bottom: 0.6rem;
             position: relative;
-            min-height: 52px;
         }
 
-        input {
+        input, select {
             width: 100%;
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             border: 2px solid var(--border);
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 0.95rem;
             background: var(--surface);
         }
 
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
         select {
-            width: 100%;
-            padding: 1rem 3rem 1rem 1.2rem;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            font-size: 0.95rem;
+            padding-right: 2.2rem;
             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") 
-                no-repeat right 0.8rem center/1.2em;
+                no-repeat right 0.6rem center/1em;
             -webkit-appearance: none;
             appearance: none;
         }
 
-        .loader-container {
-            position: absolute;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255,255,255,0.9);
-            border-radius: 12px;
+        /* 紧凑气泡设计 */
+        .bubbles-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.8rem;
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 0.2rem;
         }
 
-        .loader {
-            width: 2rem;
-            height: 2rem;
-            border: 3px solid rgba(99, 102, 241, 0.1);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .history-bubble {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 0.8rem;
+            background: rgba(99, 102, 241, 0.08);
+            color: var(--primary);
+            border-radius: 16px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .history-bubble:hover {
+            background: rgba(99, 102, 241, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .history-bubble::before {
+            content: "🔍";
+            margin-right: 0.4rem;
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+
+        /* 迷你清除按钮 */
+        .clear-bubbles {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 28px;
+            height: 28px;
+            background: rgba(99, 102, 241, 0.1);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .clear-bubbles:hover {
+            background: rgba(99, 102, 241, 0.15);
+            transform: rotate(90deg);
+        }
+
+        .clear-bubbles::before {
+            content: "×";
+            font-size: 1.2rem;
+            color: var(--primary);
+            line-height: 1;
         }
 
         button {
             width: 100%;
-            padding: 1.1rem;
+            padding: 0.85rem;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
             border: none;
-            border-radius: 12px;
-            font-weight: 600;
+            border-radius: 8px;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 1rem;
+            margin-top: 0.8rem;
+            font-size: 0.95rem;
+        }
+
+        button:hover {
+            opacity: 0.95;
+        }
+
+        button[aria-disabled="true"] {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .loader {
+            width: 1.2rem;
+            height: 1.2rem;
+            border: 2px solid rgba(99, 102, 241, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 640px) {
-            body {
-                padding: 0.5rem;
-            }
-
             .search-container {
-                padding: 1rem;
-                width: 100%;
-                max-width: 100%;
+                padding: 1.2rem;
             }
-
+            
             input, select {
-                padding: 0.9rem;
-                font-size: 0.9rem;
+                padding: 0.65rem 0.9rem;
             }
 
-            button {
-                padding: 1rem;
-                font-size: 0.95rem;
-            }
-        }
-
-        @media (max-height: 600px) {
-            .search-container {
-                margin-top: 1rem;
-                overflow-y: auto;
-                max-height: 95vh;
+            .history-bubble {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.7rem;
             }
         }
     </style>
@@ -151,23 +201,46 @@
 <body>
     <div class="search-container">
         <h1>🎬 LIBVIO 智能搜索</h1>
-        <form id="searchForm" target="_self">
+        <button type="button" class="clear-bubbles" id="clearBubbles" title="清除历史记录"></button>
+        
+        <form id="searchForm" novalidate>
             <div class="input-group">
-                <input type="text" id="searchInput" placeholder="输入影片名称..." required>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="输入影片名称..."
+                    autocomplete="off"
+                >
             </div>
+
+            <div class="bubbles-container" id="bubblesContainer"></div>
+
             <div class="input-group">
+                <select 
+                    id="urlSelect" 
+                    style="display: none"
+                    aria-label="选择访问节点"
+                >
+                    <option value="" disabled>正在检测最佳节点...</option>
+                </select>
                 <div class="loader-container" id="loaderContainer">
                     <div class="loader"></div>
                 </div>
-                <select id="urlSelect" style="display: none"></select>
             </div>
-            <button type="submit" id="searchBtn" disabled>
-                <span>立即搜索</span>
+
+            <button type="submit" id="searchBtn" aria-disabled="true">
+                立即搜索
             </button>
         </form>
     </div>
 
     <script>
+        const CONFIG = {
+            MAX_HISTORY: 8,
+            STORAGE_KEY: 'searchHistory',
+            TIMEOUT: 5000
+        };
+
         const DOMAINS = [
             "https://www.libvio.fun",
             "https://libvio.pro",
@@ -177,117 +250,142 @@
         ];
 
         const state = {
-            isDetecting: false,
-            controllers: new Set()
+            searchHistory: JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEY)) || [],
+            isDetecting: false
         };
 
         const elements = {
-            select: document.getElementById('urlSelect'),
             input: document.getElementById('searchInput'),
-            button: document.getElementById('searchBtn'),
-            loader: document.getElementById('loaderContainer')
+            bubblesContainer: document.getElementById('bubblesContainer'),
+            clearBubbles: document.getElementById('clearBubbles'),
+            form: document.getElementById('searchForm'),
+            select: document.getElementById('urlSelect'),
+            loader: document.getElementById('loaderContainer'),
+            button: document.getElementById('searchBtn')
         };
 
-        async function measureLatency(url) {
-            const controller = new AbortController();
-            const timeout = 1500;
-            const timer = setTimeout(() => controller.abort(), timeout);
-            
-            try {
-                const start = performance.now();
-                await fetch(`${url}/favicon.ico?t=${start}`, {
-                    method: 'HEAD',
-                    mode: 'no-cors',
-                    signal: controller.signal,
-                    cache: 'no-cache'
-                });
-                return performance.now() - start;
-            } catch {
-                return Infinity;
-            } finally {
-                clearTimeout(timer);
-                controller.abort();
+        // 历史记录功能
+        const SearchHistory = {
+            save: keyword => {
+                state.searchHistory = [
+                    keyword,
+                    ...state.searchHistory.filter(item => item !== keyword)
+                ].slice(0, CONFIG.MAX_HISTORY);
+                localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(state.searchHistory));
+                SearchHistory.render();
+            },
+
+            render: () => {
+                elements.bubblesContainer.innerHTML = state.searchHistory
+                    .map(keyword => `
+                        <div class="history-bubble" data-keyword="${keyword}">
+                            ${keyword}
+                        </div>
+                    `).join('');
+            },
+
+            clear: () => {
+                state.searchHistory = [];
+                localStorage.removeItem(CONFIG.STORAGE_KEY);
+                SearchHistory.render();
             }
-        }
+        };
 
-        async function efficientDetection() {
-            const promises = DOMAINS.map(async domain => {
-                const measurements = await Promise.all([
-                    measureLatency(domain),
-                    measureLatency(domain),
-                    measureLatency(domain)
-                ]);
-                
-                const valid = measurements.filter(t => t !== Infinity);
-                return {
-                    domain,
-                    latency: valid.length ? Math.min(...valid) : Infinity
-                };
-            });
+        // 节点检测功能
+        const NodeDetector = {
+            measureLatency: async (url) => {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
 
-            const results = await Promise.all(promises);
-            return results
-                .filter(r => r.latency !== Infinity)
-                .sort((a, b) => a.latency - b.latency);
-        }
-
-        async function detectBestNode() {
-            if(state.isDetecting) return;
-            
-            state.isDetecting = true;
-            elements.loader.style.display = 'flex';
-            elements.select.style.display = 'none';
-            elements.button.disabled = true;
-
-            try {
-                const timeoutPromise = new Promise(resolve => 
-                    setTimeout(() => resolve('timeout'), 5000)
-                );
-
-                const results = await Promise.race([
-                    efficientDetection(),
-                    timeoutPromise
-                ]);
-
-                if(results === 'timeout') {
-                    throw new Error('检测超时');
+                try {
+                    const start = performance.now();
+                    await fetch(`${url}/favicon.ico?t=${start}`, {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        signal: controller.signal,
+                        cache: 'no-cache'
+                    });
+                    clearTimeout(timeout);
+                    return performance.now() - start;
+                } catch {
+                    return Infinity;
                 }
+            },
 
-                elements.select.innerHTML = results.map(({ domain, latency }) => 
-                    `<option value="${domain}">${domain.replace('https://', '')} (${Math.round(latency)}ms)</option>`
-                );
+            detectNodes: async () => {
+                if (state.isDetecting) return;
+                state.isDetecting = true;
 
-                if(results.length) {
-                    elements.select.style.display = 'block';
-                    elements.select.value = results[0].domain;
-                    elements.button.disabled = false;
+                elements.loader.style.display = 'block';
+                elements.select.style.display = 'none';
+                elements.button.setAttribute('aria-disabled', 'true');
+
+                try {
+                    const results = await Promise.all(
+                        DOMAINS.map(async domain => ({
+                            domain,
+                            latency: await NodeDetector.measureLatency(domain)
+                        }))
+                    );
+
+                    const validResults = results
+                        .filter(r => r.latency !== Infinity)
+                        .sort((a, b) => a.latency - b.latency);
+
+                    if (validResults.length > 0) {
+                        elements.select.innerHTML = validResults
+                            .map(({ domain, latency }) => `
+                                <option value="${domain}">
+                                    ${domain.replace('https://', '')} (${Math.round(latency)}ms)
+                                </option>
+                            `).join('');
+                        elements.select.style.display = 'block';
+                        elements.button.setAttribute('aria-disabled', 'false');
+                    } else {
+                        alert('无法连接服务器，请检查网络连接');
+                    }
+                } catch (error) {
+                    alert('节点检测失败，请稍后重试');
+                } finally {
+                    elements.loader.style.display = 'none';
+                    state.isDetecting = false;
                 }
-            } catch {
-                elements.select.innerHTML = '<option value="" disabled>检测超时，请检查网络</option>';
-                elements.select.style.display = 'block';
-            } finally {
-                elements.loader.style.display = 'none';
-                state.isDetecting = false;
             }
-        }
+        };
 
-        document.getElementById('searchForm').addEventListener('submit', (e) => {
+        // 事件处理
+        elements.bubblesContainer.addEventListener('click', e => {
+            const bubble = e.target.closest('.history-bubble');
+            if (bubble) {
+                elements.input.value = bubble.dataset.keyword;
+                elements.input.focus();
+            }
+        });
+
+        elements.clearBubbles.addEventListener('click', SearchHistory.clear);
+
+        elements.form.addEventListener('submit', e => {
             e.preventDefault();
-            const query = elements.input.value.trim();
-            if (!query) return alert('请输入搜索内容');
+            const keyword = elements.input.value.trim();
+            const selectedDomain = elements.select.value;
 
-            const target = `${elements.select.value}/search/-------------.html?wd=${encodeURIComponent(query)}`;
-            window.location.href = target; // 确保在当前页面跳转
-        });
-
-        detectBestNode();
-        elements.input.focus();
-
-        elements.select.addEventListener('click', () => {
-            if(!state.isDetecting && elements.select.value === '') {
-                detectBestNode();
+            if (!keyword) {
+                alert('请输入搜索内容');
+                return;
             }
+
+            if (!selectedDomain) {
+                alert('请等待节点检测完成');
+                return;
+            }
+
+            SearchHistory.save(keyword);
+            window.location.href = `${selectedDomain}/search/-------------.html?wd=${encodeURIComponent(keyword)}`;
         });
+
+        // 初始化
+        SearchHistory.render();
+        NodeDetector.detectNodes();
     </script>
 </body>
 </html>
